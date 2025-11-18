@@ -1,0 +1,40 @@
+name: frontend_flutter
+description: "Projeto Previsão de Parto (Flutter)"
+publish_to: 'none' # Não publicar no pub.dev
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.8.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  provider: ^6.1.1
+  shared_preferences: ^2.2.2
+  image_picker: ^1.0.4
+  camera: ^0.10.5
+  flutter_local_notifications: ^16.3.0  
+  google_fonts: ^6.3.2
+  intl: ^0.18.1
+  cupertino_icons: ^1.0.8
+  http: ^1.5.0  # Para chamadas HTTP ao backend
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
+  # Se quiser adicionar assets (imagens, fontes) coloque aqui
+  # assets:
+  #   - assets/images/
+
+  # fonts:
+  #   - family: CustomFont
+  #     fonts:
+  #       - asset: assets/fonts/CustomFont-Regular.ttf
+  #       - asset: assets/fonts/CustomFont-Bold.ttf
+  #         weight: 700
