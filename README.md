@@ -44,8 +44,7 @@ Criar uma plataforma completa que auxilia produtores rurais, veterinários e té
 - **Python** - Backend e modelos de IA
 - **Azure Virtual Machine** - Hospedagem e escalabilidade
 - **Machine Learning** - Scikit-learn/TensorFlow/PyTorch
-- **Banco de Dados** - MongoDB
-- **Docker** - Containerização
+- **Banco de Dados** - SQL
 - **Git** - Controle de versão
 
 ## 📱 Pitch do Projeto
