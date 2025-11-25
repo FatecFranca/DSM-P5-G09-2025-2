@@ -2,30 +2,52 @@
 import 'package:flutter/foundation.dart';
 import '../models/cow_data.dart';
 import '../services/api_service.dart';
-import '../services/local_storage.dart';
 
 class CowProvider with ChangeNotifier {
   List<CowPrediction> _predictions = [];
   bool _loading = false;
+  bool _historyLoading = true;
   String? _error;
 
   List<CowPrediction> get predictions => _predictions;
   bool get loading => _loading;
+  bool get historyLoading => _historyLoading;
   String? get error => _error;
 
   CowProvider() {
-    _loadHistory();
+    _syncRemoteHistory();
   }
 
-  Future<void> _loadHistory() async {
-    try {
-      final history = await LocalStorage.getPredictionsHistory();
-      _predictions = history;
-      notifyListeners();
-    } catch (e) {
-      _error = e.toString();
+  Future<void> _syncRemoteHistory({bool showLoader = true}) async {
+    if (showLoader) {
+      _historyLoading = true;
       notifyListeners();
     }
+    try {
+      final history = await ApiService.fetchAnalyses();
+      _predictions = <CowPrediction>[];
+      for (final analysis in history) {
+        try {
+          _predictions.add(CowPrediction.fromApi(analysis));
+        } catch (e) {
+          print('Erro ao processar análise: $e');
+          print('Dados da análise: $analysis');
+        }
+      }
+      _error = null;
+    } catch (e) {
+      _error = 'Erro ao carregar histórico: $e';
+      print('Erro completo: $e');
+    } finally {
+      if (showLoader) {
+        _historyLoading = false;
+      }
+      notifyListeners();
+    }
+  }
+
+  Future<void> refreshHistory({bool showLoader = true}) async {
+    await _syncRemoteHistory(showLoader: showLoader);
   }
 
   Future<void> predictPregnancy(Map<String, dynamic> data) async {
@@ -36,17 +58,9 @@ class CowProvider with ChangeNotifier {
     try {
       final result = await ApiService.predictPregnancy(data);
       
-      final prediction = CowPrediction(
-        id: DateTime.now().millisecondsSinceEpoch,
-        data: data,
-        result: Map<String, dynamic>.from(result), 
-        timestamp: DateTime.now(),
-        imagePath: data['imagePath'],
-        imageBytes: data['imageBytes'], 
-      );
+      final prediction = CowPrediction.fromApiResponse(result, data);
 
       _predictions.insert(0, prediction);
-      await LocalStorage.savePrediction(prediction);
       
       notifyListeners();
     } catch (e) {
@@ -60,16 +74,28 @@ class CowProvider with ChangeNotifier {
   }
 
   Future<void> deletePrediction(int id) async {
-    _predictions.removeWhere((pred) => pred.id == id);
-    await LocalStorage.deletePrediction(id);
-    notifyListeners();
+    try {
+      await ApiService.deleteAnalysis(id);
+      _predictions.removeWhere((pred) => pred.id == id);
+      notifyListeners();
+      await refreshHistory(showLoader: false);
+    } catch (e) {
+      _error = 'Erro ao remover análise: $e';
+      notifyListeners();
+      rethrow;
+    }
   }
 
   // ✅ MÉTODO clearHistory ADICIONADO
   Future<void> clearHistory() async {
-    _predictions.clear();
-    await LocalStorage.clearHistory();
-    notifyListeners();
+    try {
+      await ApiService.deleteAllAnalyses();
+      await refreshHistory();
+    } catch (e) {
+      _error = 'Erro ao limpar histórico: $e';
+      notifyListeners();
+      rethrow;
+    }
   }
 
   void clearError() {
@@ -77,5 +103,7 @@ class CowProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void clearPredictions() {}
+  Future<void> clearPredictions() async {
+    await clearHistory();
+  }
 }

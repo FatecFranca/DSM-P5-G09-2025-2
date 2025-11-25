@@ -5,11 +5,9 @@ import 'screens/HomeWidget.dart';
 import 'screens/history_screen.dart';
 import 'screens/profile_screen.dart';
 import 'providers/cow_provider.dart';
-import 'services/local_storage.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await LocalStorage.init();
   runApp(MyApp());
 }
 

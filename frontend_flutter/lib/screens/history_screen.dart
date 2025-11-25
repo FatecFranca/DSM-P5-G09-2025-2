@@ -8,8 +8,27 @@ import 'package:google_fonts/google_fonts.dart';
 import '../providers/cow_provider.dart';
 import '../models/cow_data.dart';
 
-class HistoryScreen extends StatelessWidget {
+class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
+
+  @override
+  State<HistoryScreen> createState() => _HistoryScreenState();
+}
+
+class _HistoryScreenState extends State<HistoryScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshHistory(context, showLoader: true);
+    });
+  }
+
+  Future<void> _refreshHistory(BuildContext context,
+      {bool showLoader = false}) async {
+    final provider = Provider.of<CowProvider>(context, listen: false);
+    await provider.refreshHistory(showLoader: showLoader);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,25 +42,55 @@ class HistoryScreen extends StatelessWidget {
         backgroundColor: Colors.green,
         foregroundColor: Colors.white,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.delete_sweep),
-            onPressed: () => _showClearHistoryDialog(context),
+          Consumer<CowProvider>(
+            builder: (context, provider, child) {
+              return IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: provider.historyLoading
+                    ? null
+                    : () => _refreshHistory(context, showLoader: true),
+              );
+            },
+          ),
+          Consumer<CowProvider>(
+            builder: (context, provider, child) {
+              return IconButton(
+                icon: const Icon(Icons.delete_sweep),
+                onPressed: provider.historyLoading
+                    ? null
+                    : () => _showClearHistoryDialog(context),
+              );
+            },
           ),
         ],
       ),
       body: Consumer<CowProvider>(
         builder: (context, provider, child) {
+          if (provider.historyLoading) {
+            return const Center(
+              child: CircularProgressIndicator(color: Colors.green),
+            );
+          }
+
+          if (provider.error != null) {
+            return _buildErrorState(provider.error!, context);
+          }
+
           if (provider.predictions.isEmpty) {
             return _buildEmptyState();
           }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: provider.predictions.length,
-            itemBuilder: (context, index) {
-              final prediction = provider.predictions[index];
-              return _buildPredictionCard(prediction, context, index);
-            },
+          return RefreshIndicator(
+            color: Colors.green,
+            onRefresh: () => _refreshHistory(context),
+            child: ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: provider.predictions.length,
+              itemBuilder: (context, index) {
+                final prediction = provider.predictions[index];
+                return _buildPredictionCard(prediction, context, index);
+              },
+            ),
           );
         },
       ),
@@ -49,8 +98,45 @@ class HistoryScreen extends StatelessWidget {
   }
 
   // -------------------------------------------------------------
-  // SEÇÃO: TELA VAZIA
+  // SEÇÃO: TELA VAZIA / ERRO
   // -------------------------------------------------------------
+  Widget _buildErrorState(String message, BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+            const SizedBox(height: 16),
+            Text(
+              'Não foi possível carregar o histórico',
+              style: GoogleFonts.inter(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.red[700],
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              style: GoogleFonts.inter(color: Colors.grey[700]),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () => _refreshHistory(context, showLoader: true),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Tentar novamente'),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmptyState() {
     return Center(
       child: Column(
@@ -81,11 +167,11 @@ class HistoryScreen extends StatelessWidget {
     int index,
   ) {
     final isPregnant = prediction.result['prenhez'] == 'SIM';
-    final probability = prediction.result['probability'] ?? 0.0;
     final confidence = prediction.confidencePercent.toStringAsFixed(1);
     final hasImage = prediction.hasImage;
     final imageBytes = prediction.imageBytes;
     final imagePath = prediction.imagePath;
+    final statusLabel = prediction.status.toUpperCase();
 
     print('🖼️ History - Predição $index - Tem imagem: $hasImage');
     print('🖼️ History - Bytes: ${imageBytes != null}');
@@ -104,12 +190,37 @@ class HistoryScreen extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Análise #${index + 1}',
-                  style: GoogleFonts.interTight(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 17,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Análise #${index + 1}',
+                      style: GoogleFonts.interTight(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 17,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Text(
+                        statusLabel,
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -241,11 +352,7 @@ class HistoryScreen extends StatelessWidget {
   // PREVIEW DA IMAGEM (COMPATÍVEL COM WEB E MOBILE)
   // -------------------------------------------------------------
   Widget _buildImagePreview(CowPrediction prediction) {
-    final hasImage = prediction.hasImage;
-    final imageBytes = prediction.imageBytes;
-    final imagePath = prediction.imagePath;
-
-    if (!hasImage) {
+    if (!prediction.hasImage) {
       return _buildImagePlaceholder();
     }
 
@@ -295,13 +402,21 @@ class HistoryScreen extends StatelessWidget {
           return Image.file(
             file,
             fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) =>
-                _buildImagePlaceholder(),
+            errorBuilder: (context, error, stackTrace) {
+              print('❌ Erro ao carregar imagem do arquivo: $error');
+              return _buildImagePlaceholder();
+            },
           );
+        } else {
+          print('⚠️ Arquivo de imagem não encontrado: ${prediction.imagePath}');
+          print('📸 ImagePath existe mas arquivo não está mais disponível');
         }
       } catch (e) {
         print('❌ Erro ao carregar imagem do arquivo: $e');
+        print('📸 ImagePath: ${prediction.imagePath}');
       }
+    } else if (prediction.imagePath != null && kIsWeb) {
+      print('⚠️ ImagePath disponível mas estamos no Web (não suportado): ${prediction.imagePath}');
     }
 
     // Fallback
@@ -399,7 +514,6 @@ class HistoryScreen extends StatelessWidget {
   // -------------------------------------------------------------
   void _showPredictionDetails(CowPrediction prediction, BuildContext context) {
     final isPregnant = prediction.result['prenhez'] == 'SIM';
-    final probability = prediction.result['probability'] ?? 0.0;
     final confidence = prediction.confidencePercent.toStringAsFixed(1);
     final hasImage =
         prediction.imagePath != null || prediction.imageBytes != null;
@@ -663,15 +777,25 @@ class HistoryScreen extends StatelessWidget {
             child: const Text('Cancelar'),
           ),
           TextButton(
-            onPressed: () {
-              provider.clearPredictions();
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Histórico limpo com sucesso'),
-                  backgroundColor: Colors.green,
-                ),
-              );
+            onPressed: () async {
+              try {
+                await provider.clearPredictions();
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Histórico limpo com sucesso'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              } catch (e) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Erro ao limpar histórico: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
             },
             child: const Text(
               'Limpar Tudo',

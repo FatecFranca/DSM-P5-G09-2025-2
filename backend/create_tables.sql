@@ -1,9 +1,12 @@
--- cria tabela para armazenar previsões (opcional)
-CREATE TABLE IF NOT EXISTS calving_predictions (
+CREATE TABLE IF NOT EXISTS cow_analyses (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  cow VARCHAR(64),
-  prediction TINYINT,
-  probability FLOAT,
-  features JSON,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  cow_id VARCHAR(128) NOT NULL,
+  prediction TINYINT NOT NULL,
+  prediction_label VARCHAR(8) NOT NULL,
+  probability FLOAT NOT NULL,
+  payload JSON NOT NULL,
+  status VARCHAR(32) DEFAULT 'completed',
+  notes TEXT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP
 );

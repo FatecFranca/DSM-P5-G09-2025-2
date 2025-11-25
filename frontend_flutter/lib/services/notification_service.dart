@@ -70,12 +70,14 @@ class NotificationService {
       android: androidDetails,
     );
 
+    // Corrigido: Parâmetro 'androidScheduleMode' adicionado para resolver o erro de compilação.
     await _notifications.periodicallyShow(
       0,
       'Lembrete de Verificação',
       'Não se esqueça de verificar as vacas hoje!',
       RepeatInterval.daily,
       details,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
     );
   }
 }

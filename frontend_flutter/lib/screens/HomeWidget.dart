@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'dart:typed_data';
-import 'dart:io';
+import 'dart:convert';
 import '../providers/cow_provider.dart';
 import '../services/image_service.dart';
 import '../services/notification_service.dart';
@@ -388,6 +388,18 @@ class _HomeWidgetState extends State<HomeWidget> {
     print('✅ Validação passou, preparando dados...');
     final cowProvider = Provider.of<CowProvider>(context, listen: false);
 
+    String? imageBase64;
+    if (_selectedImageBytes != null) {
+      final maxSize = 500 * 1024;
+      if (_selectedImageBytes!.lengthInBytes <= maxSize) {
+        imageBase64 = base64Encode(_selectedImageBytes!);
+        print('📸 Imagem convertida para base64: ${imageBase64.length} caracteres (${_selectedImageBytes!.lengthInBytes} bytes)');
+      } else {
+        print('⚠️ Imagem muito grande (${_selectedImageBytes!.lengthInBytes} bytes > ${maxSize} bytes), não será enviada');
+        _showError('Imagem muito grande. Por favor, use uma imagem menor que 500KB.');
+      }
+    }
+
     final Map<String, dynamic> requestData = {
       'age': double.parse(controllers.keys.elementAt(0).text),
       'weight': double.parse(controllers.keys.elementAt(1).text),
@@ -397,11 +409,11 @@ class _HomeWidgetState extends State<HomeWidget> {
       'milk_production': double.parse(controllers.keys.elementAt(5).text),
       'body_temperature': double.parse(controllers.keys.elementAt(6).text),
       'imagePath': _imagePath,
-      'imageBytes': _selectedImageBytes,
+      'imageBase64': imageBase64,
       'cowId': DateTime.now().millisecondsSinceEpoch,
     };
-    // Debug: verificar se a imagem está sendo enviada
-    print('📸 Enviando imagem: ${_selectedImageBytes != null}');
+    
+    print('📸 Enviando dados - ImageBase64: ${imageBase64 != null}');
     print('📁 Caminho da imagem: $_imagePath');
     try {
       await cowProvider.predictPregnancy(requestData);
@@ -555,8 +567,7 @@ class _HomeWidgetState extends State<HomeWidget> {
 
     content.add(const SizedBox(height: 20));
 
-    // ✅ GARANTIR: Remover qualquer widget nulo
-    return content.where((widget) => widget != null).toList();
+    return content;
   }
 }
 
